@@ -12,19 +12,120 @@ typedef struct Edge {
     int u, v, weight;
 } Edge;
 
-// Edge edges[MAX_EDGES];
-// long long dist[MAX_NODES];
-// long long dp[MAX_NODES][MAX_LENGTH];
-Edge *edges;
 int n, m, k, p;
+Edge edges[MAX_EDGES];
+long long dist[MAX_NODES];
 
-long long bellman_ford() {
-    // long long dist[n + 1];
-    // long long dist[MAX_NODES];
-    long long *dist = (long long *) malloc((n + 1) * sizeof(long long));
+typedef struct EdgeNode {
+    int to, weight;
+    struct EdgeNode *next;
+} EdgeNode;
+
+typedef struct {
+    int node, cost;
+} HeapNode;
+
+typedef struct {
+    EdgeNode *head;
+} AdjList;
+
+AdjList graph[MAX_NODES];
+HeapNode heap[MAX_EDGES];
+int heapSize = 0;
+
+void push(int node, int cost) {
+    heap[++heapSize].node = node;
+    heap[heapSize].cost = cost;
+    int i = heapSize;
+
+    while (i > 1 && heap[i].cost < heap[i / 2].cost) {
+        HeapNode tmp = heap[i];
+        heap[i] = heap[i / 2];
+        heap[i / 2] = tmp;
+        i /= 2;
+    }
+}
+
+HeapNode pop() {
+    HeapNode top = heap[1];
+    heap[1] = heap[heapSize--];
+    int i = 1;
+
+    while (2 * i <= heapSize) {
+        int child = 2 * i;
+        if (child + 1 <= heapSize && heap[child + 1].cost < heap[child].cost)
+            child++;
+        if (heap[i].cost <= heap[child].cost)
+            break;
+        HeapNode tmp = heap[i];
+        heap[i] = heap[child];
+        heap[child] = tmp;
+        i = child;
+    }
+
+    return top;
+}
+
+void add_edge(int u, int v, int w) {
+    EdgeNode *edge = (EdgeNode *) malloc(sizeof(EdgeNode));
+    if (!edge) {
+        fprintf(stderr, "Memory allocation failed\n");
+        exit(1);
+    }
+    edge->to = v;
+    edge->weight = w;
+    edge->next = graph[u].head;
+    graph[u].head = edge;
+}
+
+void free_graph() {
+    for (int v = 0; v <= n; v++) {
+        EdgeNode *head = graph[v].head;
+        EdgeNode *prev;
+        while (head != NULL) {
+            prev = head;
+            head = head->next;
+            free(prev);
+        }
+        graph[v].head = NULL;
+    }
+}
+
+long long dijkstra() {
     for (int i = 1; i <= n; i++) {
         dist[i] = LLONG_MAX;
     }
+
+    heapSize = 0;
+    dist[1] = 0;
+    push(1, 0);
+
+    while (heapSize > 0) {
+        HeapNode u = pop();
+
+        if (u.cost > dist[u.node]){
+            continue;
+        }
+
+        for (EdgeNode *edge = graph[u.node].head; edge; edge = edge->next) {
+            int v = edge->to;
+            int weight = edge->weight;
+
+            if (dist[u.node] + weight < dist[v]) {
+                dist[v] = dist[u.node] + weight;
+                push(v, dist[v]);
+            }
+        }
+    }
+
+    return dist[n];
+}
+
+long long bellman_ford() {
+    for (int i = 1; i <= n; i++) {
+        dist[i] = LLONG_MAX;
+    }
+
     dist[1] = 0;
 
     for (int i = 1; i <= n - 1; i++) {
@@ -39,43 +140,19 @@ long long bellman_ford() {
         }
     }
 
-    long long d = dist[n];
-    free(dist);
-
-    return d;
+    return dist[n];
 }
 
 long long count_paths(int max_length) {
-    clock_t before = clock();
     long long **dp = (long long **) malloc((n + 1) * sizeof(long long *));
-    // if (dp == NULL) {
-    //     perror("Failed to allocate memory for dp array");
-    //     exit(EXIT_FAILURE);
-    // }
-
     for (int i = 0; i <= n; i++) {
         dp[i] = (long long *) malloc((max_length + 1) * sizeof(long long));
-        // if (dp[i] == NULL) {
-        //     perror("Failed to allocate memory for dp row");
-        //     exit(EXIT_FAILURE);
-        // }
         for (int j = 0; j <= max_length; j++) {
             dp[i][j] = 0;
         }
     }
 
-    // long long dp[MAX_NODES][MAX_LENGTH];
-    // for (int i = 0; i <= n; i++) {
-    //     for (int j = 0; j <= max_length; j++) {
-    //         dp[i][j] = 0;
-    //     }
-    // }
     dp[1][0] = 1;
-
-    clock_t diff = clock() - before;
-    printf("dp alloc: %ld\n", diff * 1000 / CLOCKS_PER_SEC);
-
-    before = clock();
 
     for (int length = 0; length < max_length; length++) {
         for (int j = 0; j < m; j++) {
@@ -94,19 +171,10 @@ long long count_paths(int max_length) {
         paths = (paths + dp[n][length]) % p;
     }
 
-    diff = clock() - before;
-    printf("dp algo: %ld\n", diff * 1000 / CLOCKS_PER_SEC);
-
-    before = clock();
-
     for (int i = 0; i <= n; i++) {
         free(dp[i]);
     }
     free(dp);
-
-    diff = clock() - before;
-    printf("dp dealloc: %ld\n", diff * 1000 / CLOCKS_PER_SEC);
-
 
     return paths;
 }
@@ -132,10 +200,6 @@ int main() {
         k = fast_read();
         p = fast_read();
 
-        clock_t before = clock();
-
-        edges = (Edge *) malloc(m * sizeof(Edge));
-
         for (int i = 0; i < m; i++) {
             int u = fast_read();
             int v = fast_read();
@@ -143,17 +207,10 @@ int main() {
             edges[i].u = u;
             edges[i].v = v;
             edges[i].weight = w;
+            add_edge(u, v, w);
         }
 
-        clock_t diff = clock() - before;
-        printf("reading edges: %ld\n", diff * 1000 / CLOCKS_PER_SEC);
-
-        before = clock();
-
-        long long d = bellman_ford();
-
-        diff = clock() - before;
-        printf("bellman ford: %ld\n", diff * 1000 / CLOCKS_PER_SEC);
+        long long d = dijkstra();
 
         if (d == LLONG_MAX) {
             printf("-1\n");
@@ -166,7 +223,7 @@ int main() {
             }
         }
 
-        free(edges);
+        free_graph();
     }
     return 0;
 }
