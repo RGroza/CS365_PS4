@@ -2,24 +2,24 @@
 #include <stdlib.h>
 #include <limits.h>
 
-#define MAX_NODES 1005
-#define MAX_EDGES 2005
-#define MAX_LENGTH 10005
+#define MAX_NODES 10000
+#define MAX_EDGES 20000
+#define MAX_LENGTH 10050
 
 typedef struct Edge {
     int u, v, weight;
 } Edge;
 
 Edge edges[MAX_EDGES];
-int dist[MAX_NODES];
+long long dist[MAX_NODES];
 long long dp[MAX_NODES][MAX_LENGTH];
 int n, m, k, p;
 
-void bellman_ford(int start) {
+long long bellman_ford() {
     for (int i = 1; i <= n; i++) {
-        dist[i] = INT_MAX;
+        dist[i] = LLONG_MAX;
     }
-    dist[start] = 0;
+    dist[1] = 0;
 
     for (int i = 1; i <= n - 1; i++) {
         for (int j = 0; j < m; j++) {
@@ -27,50 +27,39 @@ void bellman_ford(int start) {
             int v = edges[j].v;
             int weight = edges[j].weight;
 
-            if (dist[u] != INT_MAX && dist[u] + weight < dist[v]) {
+            if (dist[u] != LLONG_MAX && dist[u] + weight < dist[v]) {
                 dist[v] = dist[u] + weight;
             }
         }
     }
+    return dist[n];
 }
 
-long long count_paths(int exact_length) {
+long long count_paths(int max_length) {
     for (int i = 1; i <= n; i++) {
-        for (int j = 0; j <= exact_length; j++) {
+        for (int j = 0; j <= max_length; j++) {
             dp[i][j] = 0;
         }
     }
     dp[1][0] = 1;
 
-    for (int length = 0; length < exact_length; length++) {
+    for (int length = 0; length < max_length; length++) {
         for (int j = 0; j < m; j++) {
             int u = edges[j].u;
             int v = edges[j].v;
             int weight = edges[j].weight;
 
-            if (length + weight <= exact_length) {
+            if (length + weight <= max_length) {
                 dp[v][length + weight] = (dp[v][length + weight] + dp[u][length]) % p;
             }
         }
-        // printf("length: %d\n\t", length);
-        // for (int i = 1; i <= n; i++) {
-        //     printf("%d ", i);
-        // }
-        // printf("\n\n");
-        // for (int j = 0; j <= exact_length; j++) {
-        //     printf("%d\t", j);
-        //     for (int i = 1; i <= n; i++) {
-        //         printf("%lld ", dp[i][j]);
-        //     }
-        //     printf("\n");
-        // }
-        // printf("\n\n");
     }
 
     int paths = 0;
-    for (int length = 0; length <= exact_length; length++) {
-        paths += dp[n][length];
+    for (int length = 0; length <= max_length; length++) {
+        paths = (paths + dp[n][length]) % p;
     }
+
     return paths;
 }
 
@@ -104,11 +93,9 @@ int main() {
             edges[i].weight = w;
         }
 
-        bellman_ford(1);
+        long long d = bellman_ford();
 
-        int d = dist[n];
-
-        if (d == INT_MAX) {
+        if (d == LLONG_MAX) {
             printf("-1\n");
         } else {
             long long result = count_paths(d + k);
